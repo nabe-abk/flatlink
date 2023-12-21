@@ -9,67 +9,77 @@
 ///////////////////////////////////////////////////////////////////////////////
 // variables
 ///////////////////////////////////////////////////////////////////////////////
-uint32	max_seg    = MAX_SEGENTS;
-uint32	max_pubs   = MAX_PUBS;
-uint32	max_fixups = MAX_FIXUPS;
+uint32	max_segs;
+uint32	max_pubs;
+uint32	max_fixups;
+uint32  total_memory = 0;
 
-int	seg_c = 0;
+int	seg_c   = 0;
+int	pub_c   = 0;
+int	fixup_c = 0;
 int	local_seg_c;
-int	list_name_c;
-int	ext_name_c;
 
-Segment **segs;
+Segment *all_segs;
+PubName *all_pubs;
+Fixup   *all_fixups;
+
+// PubName's hash table
 PubName	**pub_idx_1st;
 PubName	**pub_idx_cur;
-LsName	**list_names;
-ExtName	**ext_names;
+
+// Temporary buffer for load_obj()
+int	list_name_c;
+int	ext_name_c;
+LsName	*list_names;
+ExtName	*ext_names;
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // malloc
 ///////////////////////////////////////////////////////////////////////////////
+
+void alloc_fail(size_t size) {
+	fprintf(stderr, "memory allocation failed! try %ld KB, used %d KB\n",
+		(size         + 0x3ff) >>10,
+		(total_memory + 0x3ff) >>10
+	);
+	exit(10);
+}
+
 void *malloc_x(size_t size) {
 	void *p = malloc(size);
-	if (!p) {
-		fprintf(stderr, "memory allocation failed!\n");
-		exit(10);
-	}
+	if (!p) alloc_fail(size);
+
+	total_memory += size;
 	return p;
 }
 
 void *calloc_x(size_t num, size_t size) {
 	void *p = calloc(num, size);
-	if (!p) {
-		fprintf(stderr, "memory allocation failed!\n");
-		exit(10);
-	}
+	if (!p) alloc_fail(num*size);
+
+	total_memory += num*size;
 	return p;
+}
+
+uint32 get_total_alloc_memory() {
+	return total_memory;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // init
 ///////////////////////////////////////////////////////////////////////////////
-void *init_pointer_ary(size_t st_size, size_t count) {
+void init_memory(uint32 _max_segs, uint32 _max_pubs, uint32 _max_fixups) {
+	max_segs    = _max_segs;
+	max_pubs    = _max_pubs;
+	max_fixups  = _max_fixups;
 
-	void **ary = (void **)calloc_x(count, sizeof(void *));	// pointer ary
-	uchar *p   = (uchar *)calloc_x(count, st_size);		// struct buffer
+	all_segs    = (Segment  *)calloc_x(sizeof(Segment), max_segs);
+	all_pubs    = (PubName  *)calloc_x(sizeof(PubName), max_pubs);
+	all_fixups  = (Fixup    *)calloc_x(sizeof(Fixup),   max_fixups);
 
-	for(int i=0; i<count; i++) {
-		ary[i] = p;
-		p += st_size;
-	}
-	return ary;
-}
-
-void init_memory(int mul) {
-	if (mul) {
-		max_seg    *= mul;
-		max_pubs   *= mul;
-		max_fixups *= mul;
-	}
-
-	segs        = (Segment **)init_pointer_ary(sizeof(Segment), max_seg);
-	list_names  = (LsName  **)init_pointer_ary(sizeof(LsName),  max_seg);
-	ext_names   = (ExtName **)init_pointer_ary(sizeof(ExtName), max_fixups);
+	list_names  = (LsName   *)calloc_x(sizeof(LsName),  max_segs);
+	ext_names   = (ExtName  *)calloc_x(sizeof(ExtName), max_fixups);
 	pub_idx_1st = (PubName **)calloc_x(0x100, sizeof(PubName *));
 	pub_idx_cur = (PubName **)calloc_x(0x100, sizeof(PubName *));
 }
@@ -82,19 +92,19 @@ void init_list_name() {
 }
 
 int add_list_name(char *name) {
-	if (max_seg <= list_name_c) {
-		fprintf(stderr, "Too many list of names! (max=%d)\n", max_seg);
+	if (max_segs <= list_name_c) {
+		fprintf(stderr, "Too many list of names! (max=%d)\n", max_segs);
 		exit(11);
 	}
 
-	LsName *p = list_names[list_name_c++];
+	LsName *p = &list_names[list_name_c++];
 	p->name  = name;
 
 	return list_name_c;
 }
 
 char *load_list_name(int index) {
-	return list_names[index-1]->name;
+	return list_names[index-1].name;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -105,19 +115,19 @@ void init_ext_name() {
 }
 
 int add_ext_name(char *name) {
-	if (max_seg <= ext_name_c) {
-		fprintf(stderr, "Too many extern names! (max=%d)\n", max_fixups);
+	if (max_segs <= ext_name_c) {
+		fprintf(stderr, "Too many extern names! (max=%d)\n", max_segs);
 		exit(11);
 	}
 
-	ExtName *p = ext_names[ext_name_c++];
+	ExtName *p = &ext_names[ext_name_c++];
 	p->name = name;
 
 	return ext_name_c;
 }
 
 char *load_ext_name(int index) {
-	return ext_names[index-1]->name;
+	return ext_names[index-1].name;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -131,24 +141,23 @@ int num_of_local_segs() {
 }
 
 Segment *add_seg() {
-	if (max_seg <= seg_c) {
-		fprintf(stderr, "Too many segment! (max=%d)\n", max_seg);
+	if (max_segs <= seg_c) {
+		fprintf(stderr, "Too many segment! (max=%d)\n", max_segs);
 		exit(11);
 	}
-	Segment *seg = segs[seg_c++];
-	seg->entry = 0xffffffff;
-	seg->index = seg_c - local_seg_c;
+	Segment *seg = &all_segs[seg_c++];
+	seg->index   = seg_c - local_seg_c;	// index in a obj file
 
 	return seg;
 }
 
 Segment *load_seg(int index) {
-	return segs[local_seg_c + index -1];
+	return &all_segs[local_seg_c + index -1];
 }
 
-Segment **load_all_segs(int *count) {
+Segment *load_all_segs(int *count) {
 	*count = seg_c;
-	return segs;
+	return all_segs;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -166,15 +175,16 @@ int make_str_hash(uchar *p) {
 }
 
 void add_pub_name(Segment *seg, int offset, char *name) {
-	if (max_pubs <= seg->pub_c) {
+	if (max_pubs <= pub_c) {
 		fprintf(stderr, "Too many public name! (max=%d)\n", max_pubs);
 		exit(11);
 	}
-	if (!seg->pubs) {	// alloc memory
-		seg->pubs = (PubName **)init_pointer_ary(sizeof(PubName), max_pubs);
+	if (!seg->pubs) {	// set memory
+		seg->pubs = &all_pubs[ pub_c ];
 	}
 
-	PubName *pub = seg->pubs[ (seg->pub_c)++ ];
+	PubName *pub = &all_pubs[ pub_c++ ];
+	seg->pub_c++; 
 	pub->seg    = seg;
 	pub->offset = offset;
 	pub->name   = name;
@@ -235,13 +245,14 @@ PubName *search_pub_name(char *name, char *f_name) {
 // fixup
 ///////////////////////////////////////////////////////////////////////////////
 Fixup *add_fixup(Segment *seg) {
-	if (max_fixups <= seg->fixup_c) {
+	if (max_fixups <= fixup_c) {
 		fprintf(stderr, "Too many fixup! (max=%d)\n", max_fixups);
 		exit(11);
 	}
 	if (!seg->fixups) {	// alloc memory
-		seg->fixups = (Fixup **)init_pointer_ary(sizeof(Fixup), max_fixups);
+		seg->fixups = &all_fixups[ fixup_c ];
 	}
-	return seg->fixups[ (seg->fixup_c)++ ];
+	seg->fixup_c++;
+	return &all_fixups[ fixup_c++ ];
 }
 

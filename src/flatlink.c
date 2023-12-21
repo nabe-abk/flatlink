@@ -51,7 +51,7 @@ void ERR_PRINT(const char *fmt, ...) {
 	va_end(args);
 }
 
-void print_seg_info(FILE *fp, Segment *seg, char *append) {
+void PRINT_seg_info(FILE *fp, Segment *seg, char *append) {
 	fprintf(fp, "[%06X] %s: %s '%s' use%d align=%d size=%d%s\n",
 		seg->base, seg->f_name,
 		seg->name, seg->c_name,
@@ -59,11 +59,11 @@ void print_seg_info(FILE *fp, Segment *seg, char *append) {
 		append ? append : ""
 	);
 }
-void print_seg_info_ex(FILE *fp, Segment *seg, const char *fmt, uint32 val) {
+void PRINT_seg_info_ex(FILE *fp, Segment *seg, const char *fmt, uint32 val) {
 	char buf[64];
 	buf[0] = ' ';
 	sprintf(buf+1, fmt, val);	// High-C V1.7 not impliment snprintf()
-	print_seg_info(fp, seg, buf);
+	PRINT_seg_info(fp, seg, buf);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -221,10 +221,14 @@ int main(int argc, char *argv[]) {
 
 	ExpInfo exp;
 	memset(&exp, 0, sizeof(exp));
-	exp.offset       = 0x1000;
-	exp.stack        = 0x1000;
-	exp.mindata      = 0x1000;
-	exp.maxdata      = 0xffffffff;
+	exp.offset   = 0x1000;
+	exp.stack    = 0x1000;
+	exp.mindata  = 0x1000;
+	exp.maxdata  = 0xffffffff;
+
+	uint32	max_segs   = MAX_SEGENTS;
+	uint32	max_pubs   = MAX_PUBS;
+	uint32	max_fixups = MAX_FIXUPS;
 
 	for(i=0; i<args_c; i++) {
 		char *p = args[i];
@@ -300,6 +304,19 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 
+		if (!strcmp(p, "-maxsegs")) {
+			max_segs = parse_num(val);
+			continue;
+		}
+		if (!strcmp(p, "-maxpubs")) {
+			max_pubs = parse_num(val);
+			continue;
+		}
+		if (!strcmp(p, "-maxfixups")) {
+			max_fixups = parse_num(val);
+			continue;
+		}
+
 		ERR_PRINT("Unknown argument: %s\n", p);
 		exit(1);
 	}
@@ -309,7 +326,7 @@ int main(int argc, char *argv[]) {
 	//---------------------------------------------------------------------
 	if (help || !files) {
 		printf(
-			"\nUsage: %s [options] obj_file ...\n"
+			"\nUsage: %s [@respons_file] [options] obj_file ...\n"
 			"\n"
 			"	-o file		output file. '.com' or '.bin' is set 'com' format\n"
 			"	-f format	'exp' or 'com' or 'bin'\n"
@@ -324,6 +341,9 @@ int main(int argc, char *argv[]) {
 			"	-mindata num	exp file's minimum heap (default 1000h)\n"
 			"	-maxdata num	exp file's maximum heap\n"
 			"\n"
+			"	-maxsegs   num	maximum segment	     (default " TO_STR(MAX_SEGENTS) ")\n"
+			"	-maxpubs   num	maximum public names (default " TO_STR(MAX_PUBS)    ")\n"
+			"	-maxfixups num	maximum fixups       (default " TO_STR(MAX_FIXUPS)  ")\n"
 			, argv[0]
 		);
 		return 0;
@@ -360,7 +380,7 @@ int main(int argc, char *argv[]) {
 	//---------------------------------------------------------------------
 	// load object files
 	//---------------------------------------------------------------------
-	init_memory(1);
+	init_memory(max_segs, max_pubs, max_fixups);
 
 	for(i=0; i<files; i++) {
 		int flag=1;
@@ -380,54 +400,55 @@ int main(int argc, char *argv[]) {
 	// Rearrange segments
 	//---------------------------------------------------------------------
 	int seg_c;
-	Segment **segs = load_all_segs(&seg_c);
-	if (!seg_c) {
-		ERR_PRINT("Segment not found!");
-		exit(3);
-	}
+	Segment **segs;
 
-	int ary_c = 0;
-	Segment **ary = (Segment **)calloc_x(sizeof(Segment *), seg_c);
+	if (1) {
+		Segment *org_segs = load_all_segs(&seg_c);
+		if (!seg_c) {
+			ERR_PRINT("Segment not found!");
+			exit(3);
+		}
 
-	// copy valid segment to ary
-	for(i=0; i<seg_c; i++) {
-		Segment *seg = segs[i];
-		ary[ary_c++] = seg;
+		// class name to Upper Case
+		for(i=0; i<seg_c; i++) {
+			Segment *seg = &org_segs[i];
+			char *p = seg->c_name;
+			if (!p) continue;
 
-		char *p = seg->c_name;
-		if (!p || !*p) continue;
+			// class name to upper case
+			while(*p) {
+				if ('a'<= *p && *p<='z') *p -= 0x20;
+				p++;
+			}
+		}
 
-		// class name to upper case
-		while(*p) {
-			if ('a'<= *p && *p<='z') *p -= 0x20;
-			p++;
+
+		int s_idx = 0;
+		segs = (Segment **)calloc_x(sizeof(Segment *), seg_c);
+
+		// sort and set pointer to *segs[]
+		for(i=0; i<seg_c; i++) {
+			Segment *seg = &org_segs[i];
+			char *p = seg->c_name;
+			if (!p || !*p || !strcmp(p, "CODE")) {	// null class or CODE class
+				seg->index = -1;		// pickuped mark
+				segs[s_idx++] = seg;
+			}
+		}
+		for(i=0; i<seg_c; i++) {
+			Segment *seg = &org_segs[i];
+			if (!strcmp(seg->c_name, "DATA")) {
+				seg->index = -1;	// pickuped mark
+				segs[s_idx++] = seg;
+			}
+		}
+		for(i=0; i<seg_c; i++) {
+			Segment *seg = &org_segs[i];
+			if (seg->index == -1) continue;
+			ERR_PRINT("[%s] Segment class %s is not support! (name=%s)\n", seg->f_name, seg->c_name, seg->name);
+			exit(4);
 		}
 	}
-
-	// sort and copy ary[] to segs[]
-	seg_c = 0;
-	for(i=0; i<ary_c; i++) {
-		Segment *seg = ary[i];
-		char *p = seg->c_name;
-		if (!p || !*p || !strcmp(p, "CODE")) {	// null class or CODE class
-			seg->index = -1;		// pickuped mark
-			segs[seg_c++] = seg;
-		}
-	}
-	for(i=0; i<ary_c; i++) {
-		Segment *seg = ary[i];
-		if (!strcmp(seg->c_name, "DATA")) {
-			seg->index = -1;	// pickuped mark
-			segs[seg_c++] = seg;
-		}
-	}
-	for(i=0; i<ary_c; i++) {
-		Segment *seg = ary[i];
-		if (seg->index == -1) continue;
-		ERR_PRINT("[%s] Segment class %s is not support! (name=%s)\n", seg->f_name, seg->c_name, seg->name);
-		exit(4);
-	}
-	ary = 0;
 
 	//---------------------------------------------------------------------
 	// fix com file data for compatible alink
@@ -467,18 +488,18 @@ int main(int argc, char *argv[]) {
 			exp.set_entry++;
 			exp.entry = entry;
 
-			print_seg_info_ex(stdout, seg, "entry=%06X", entry);
-			print_seg_info_ex(fmap,   seg, "entry=%06X", entry);
+			PRINT_seg_info_ex(stdout, seg, "entry=%06X", entry);
+			PRINT_seg_info_ex(fmap,   seg, "entry=%06X", entry);
 		} else {
-			print_seg_info(stdout, seg, 0);
-			print_seg_info(fmap,   seg, 0);
+			PRINT_seg_info(stdout, seg, 0);
+			PRINT_seg_info(fmap,   seg, 0);
 		}
 
 		// set all pub names offset
-		int pub_c      = seg->pub_c;
-		PubName **pubs = seg->pubs;
+		int pub_c     = seg->pub_c;
+		PubName *pubs = seg->pubs;
 		for(int j=0; j<pub_c; j++) {
-			PubName *p = pubs[j];
+			PubName *p = &pubs[j];
 			p->offset += base;
 			VV_PRINT("\t[%06X] pub name: %s\n", p->offset, p->name);
 			fprintf(fmap, "%08X %s\n", p->offset, p->name);
@@ -503,15 +524,15 @@ int main(int argc, char *argv[]) {
 	//---------------------------------------------------------------------
 	int not_found = 0;
 	for(i=0; i<seg_c; i++) {
-		Segment *seg   = segs[i];
-		int fixup_c    = seg->fixup_c;
-		Fixup **fixups = seg->fixups;
-		uint32 base    = seg->base;
+		Segment *seg  = segs[i];
+		int fixup_c   = seg->fixup_c;
+		Fixup *fixups = seg->fixups;
+		uint32 base   = seg->base;
 
-		if (V_PRINT_COND) print_seg_info_ex(stdout, seg, "fixup=%d", fixup_c);
+		if (V_PRINT_COND) PRINT_seg_info_ex(stdout, seg, "fixup=%d", fixup_c);
 
 		for(int j=0; j<fixup_c; j++) {
-			Fixup *fixup = fixups[j];
+			Fixup *fixup = &fixups[j];
 			uchar *p      = seg->code + fixup->offset;	// fix point
 			uint32 offset =      base + fixup->offset;	// code offset
 			int    bits32 = fixup->bits32;
@@ -598,7 +619,8 @@ int main(int argc, char *argv[]) {
 	}
 	fclose(fp);
 
-	printf("Write \"%s\" %d bytes\n", outfile, size);
+	printf("Used %d KB of heap memory.\n", (get_total_alloc_memory() + 0x3ff) >> 10);
+	printf("Write \"%s\" %d bytes.\n", outfile, size);
 
 	return 0;
 }

@@ -46,12 +46,9 @@ struct _seg {
 	char	*c_name;	// segment class name
 
 	int	pub_c;		// public names counter
-	PubName	**pubs;		// public names
-	int	ext_c;		// extern names counter
-	ExtName	**exts;		// extern names
-
+	PubName	*pubs;		// public names
 	int	fixup_c;	// fixup names counter
-	Fixup	**fixups;	// fixups
+	Fixup	*fixups;	// fixups
 
 	int	prev_offset;	// previous LEDATA's offset
 	uchar	*code;		// segment code data
@@ -60,10 +57,10 @@ struct _seg {
 ///////////////////////////////////////////////////////////////////////////////
 // functions
 ///////////////////////////////////////////////////////////////////////////////
-
 void *malloc_x(size_t size);
 void *calloc_x(size_t num, size_t size);
-void init_memory(int mul);
+void init_memory(uint32 max_segs, uint32 max_pubs, uint32 max_fixups);
+uint32 get_total_alloc_memory();
 
 void  init_list_name();
 int    add_list_name(char *name);
@@ -78,7 +75,7 @@ int  num_of_local_segs();
 
 Segment *add_seg();
 Segment *load_seg(int index);
-Segment **load_all_segs(int *count);
+Segment *load_all_segs(int *count);
 
 void add_pub_name(Segment *seg, int offset, char *name);
 int check_duplicate_pub_name();

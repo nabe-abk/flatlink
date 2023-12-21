@@ -1,13 +1,15 @@
 #ifndef __FLATLINK_H__
 #define __FLATLINK_H__
 
-#define VERSION		"Ver0.80 2023-12-19"
+#define VERSION		"Ver0.81 2023-12-21"
 
-#define	MAX_ARGS	256		// maximum arguments
-#define MAX_SEGENTS	0x0400		// maximum segment1
-#define MAX_PUBS	0x4000		// maximum public name           per segment
-#define MAX_FIXUPS	0x4000		// maximum fixup and extern name per segment
+#define	MAX_ARGS	 256		// maximum arguments
+#define MAX_SEGENTS	 100		// maximum segments    (total)
+#define MAX_PUBS	3000		// maximum public name (total)
+#define MAX_FIXUPS	3000		// maximum fixup       (total)
 
+#define _STR(num)	#num
+#define TO_STR(num)	_STR(num)
 #define uchar		unsigned char
 #define uint32		unsigned int
 
