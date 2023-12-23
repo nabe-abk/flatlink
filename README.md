@@ -54,6 +54,10 @@ Usage: flatlink [options] obj_file ...
     -stack   num    exp file's stack size   (default 1000h)
     -mindata num    exp file's minimum heap (default 1000h)
     -maxdata num    exp file's maximum heap
+
+    -maxsegs   num  maximum segments     (default 100)
+    -maxpubs   num  maximum public names (default 3000)
+    -maxfixups num  maximum fixups       (default 3000)
 ```
 
 This options will be similar to 386|LINK (386LINK.EXE, 386LINKP.EXP).

@@ -341,7 +341,7 @@ int main(int argc, char *argv[]) {
 			"	-mindata num	exp file's minimum heap (default 1000h)\n"
 			"	-maxdata num	exp file's maximum heap\n"
 			"\n"
-			"	-maxsegs   num	maximum segment	     (default " TO_STR(MAX_SEGENTS) ")\n"
+			"	-maxsegs   num	maximum segments     (default " TO_STR(MAX_SEGENTS) ")\n"
 			"	-maxpubs   num	maximum public names (default " TO_STR(MAX_PUBS)    ")\n"
 			"	-maxfixups num	maximum fixups       (default " TO_STR(MAX_FIXUPS)  ")\n"
 			, argv[0]
