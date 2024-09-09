@@ -1,7 +1,7 @@
 #ifndef __FLATLINK_H__
 #define __FLATLINK_H__
 
-#define VERSION		"Ver0.81 2023-12-21"
+#define VERSION		"Ver0.82 2024-09-09"
 
 #define	MAX_ARGS	 256		// maximum arguments
 #define MAX_SEGENTS	 100		// maximum segments    (total)

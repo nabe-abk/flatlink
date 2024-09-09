@@ -321,6 +321,9 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	if (verbose<0) fclose(stdout);
+	printf("FlatLink - .EXP and .COM file linker - " VERSION " (C)nabe@abk\n");
+
 	//---------------------------------------------------------------------
 	// help
 	//---------------------------------------------------------------------
@@ -348,9 +351,6 @@ int main(int argc, char *argv[]) {
 		);
 		return 0;
 	}
-
-	if (verbose<0) fclose(stdout);
-	printf("FlatLink - .EXP and .COM file linker - " VERSION " (C)nabe@abk\n");
 
 	//---------------------------------------------------------------------
 	// auto set outfile and mapfile
@@ -554,11 +554,11 @@ int main(int argc, char *argv[]) {
 					continue;
 				}
 				val = _val = pub->offset;
-
-				if (fixup->relative) {	// need relative offset
-					val = val - (offset + (bits32 ? 4 : 2));
-				}
 			}
+			if (fixup->relative) {	// need relative offset
+				val = val - (offset + (bits32 ? 4 : 2));
+			}
+
 			if (bits32) {
 				write_int32(p, val);
 				VV_PRINT("\tfixup [%06X] = %08X for %08X: label=%s\n",         offset, val, _val, ref_name);
