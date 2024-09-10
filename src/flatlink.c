@@ -542,9 +542,9 @@ int main(int argc, char *argv[]) {
 			uint32 val;
 			uint32 _val;
 
+			uint32 current = fixup->place ? fixup->place : (bits32 ? read_int32(p) : read_int16(p));
+
 			if (ref_seg) {
-				uint32 current	= fixup->place ? fixup->place
-						: (bits32 ? read_int32(p) : read_int16(p));
 				val = _val = current + ref_seg->base;
 			} else {
 				ref_name = fixup->ref_name;
@@ -553,7 +553,7 @@ int main(int argc, char *argv[]) {
 					not_found++;
 					continue;
 				}
-				val = _val = pub->offset;
+				val = _val = current + pub->offset;
 			}
 			if (fixup->relative) {	// need relative offset
 				val = val - (offset + (bits32 ? 4 : 2));

@@ -11,8 +11,8 @@ Free386 is a PDS software compatible with 386|DOS-Extender "RUN386.EXE".
 
 ## Overview
 
-* Version: 0.81
-* Date: **2023-12-21**
+* Version: 0.82
+* Date: **2024-09-10**
 * Author: [nabe@abk](https://twitter.com/nabe_abk)
 * Link Target: 386|DOS-Extender Binary(.exp), MS-DOS Binary(.com)
 * Linker Host: Linux, 386|DOS-Extender([Free386](https://github.com/nabe-abk/free386) or RUN386) on MS-DOS
