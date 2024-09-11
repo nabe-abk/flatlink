@@ -1,0 +1,20 @@
+#--------------------------------------
+# ignore default
+#--------------------------------------
+/*
+*.o
+*.obj
+*.com
+*.exp
+*.map
+
+*.OBJ
+*.COM
+*.EXP
+*.MAP
+
+!/src/
+!/test/
+!*.sh
+!README.md
+!CHANGES.txt
