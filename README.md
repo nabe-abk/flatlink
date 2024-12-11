@@ -1,6 +1,6 @@
 # FlatLink - a flat mode free linker
 
-Created for generating Phar Lap EXP files using [NASM - the Netwide Assembler](https://github.com/netwide-assembler/nasm) in December 2023.
+Created to generate Phar Lap EXP and COM files using [NASM - the Netwide Assembler](https://github.com/netwide-assembler/nasm) in December 2023.
 
 NASM can generate COM file directly, but cannot be generated from OBJ files.
 Also, if you wanted to generate EXP using NASM, there was no easy-to-use free linker.
